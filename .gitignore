@@ -1,3 +1,16 @@
+# local data
+embeddings/
+*.json
+*.geojson
+*.zip*
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.gpkg
+*.parquet
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
