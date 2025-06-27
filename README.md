@@ -24,8 +24,9 @@ So far, the typical use cases highlighted are image classification. Examples inc
 
 Recently, Earth Genome released global 2024 embeddings produced with a model that natively encodes image patch embeddings, while Google EFM released their pixel-based global EFM embeddings dataset (annual datasets for xx - 2024).
 
-Our experiment is two-fold:
-1. Can a pixel-based embedding dataset be engineered to perform comparatively on image classification tasks against a patch-based embedding dataset? What's involved and how feasible is it to do?
-2. Can a patch-based embedding dataset be engineered to perform comparatively on image segmentation tasks against a pixel-based embedding dataset? What's involved and how feasible is it to do?
+Our experiment:
+
+Can a pixel-based embedding dataset be engineered to perform comparatively on image classification tasks against a patch-based embedding dataset? What's involved and how feasible is it to do?
+
 
 In the process we hope to at least come away with some newly discovered considerations, challenges, and opinions about what's next for brdiging the pixel/patch divide. Our takeaways will obviously be limited in context to our results (this one model of each type among many other experiment decisions), so take them with a grain of salt.
