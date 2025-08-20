@@ -1,5 +1,11 @@
 geemap
+geopandas
 earthengine-api
+geojson
 google-cloud-bigquery
 pytest
 pytest-mock
+PyYAML
+db-dtypes
+fastapi
+uvicorn[standard]

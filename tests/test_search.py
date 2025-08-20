@@ -13,13 +13,13 @@ def test_search_result_success_when_table_exists(mock_table_exists, mock_vector_
     """
     # Arrange: Configure mocks
     mock_table_exists.return_value = True
-    expected_df = pd.DataFrame({'target_plotid':['5','5'],'base_plotid': [101, 102], 'distance': [0.1, 0.2]})
+    expected_df = pd.DataFrame({'target_plotid':[5, 5],'base_plotid': [101, 102], 'distance': [0.1, 0.2]})
     mock_vector_search.return_value = expected_df
 
     project = "test-project"
     dataset = "test-dataset"
     table = "test-table"
-    uniqueid = "5"
+    uniqueid = 5
     matches = 2
 
     # Act: Call the function under test
@@ -52,7 +52,7 @@ def test_search_result_raises_error_when_table_not_found(mock_table_exists, mock
 
     # Act & Assert: Use pytest.raises to check for the expected exception
     with pytest.raises(FileNotFoundError) as excinfo:
-        search_result(uniqueid="5", matches=2, project=project, dataset=dataset, table=table)
+        search_result(uniqueid=5, matches=2, project=project, dataset=dataset, table=table)
 
     # Assert that the exception message is correct and no search was attempted
     assert f"The table {project}.{dataset}.{table} does not exist." in str(excinfo.value)

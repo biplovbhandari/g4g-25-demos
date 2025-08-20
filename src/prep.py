@@ -26,19 +26,21 @@ def prep_tables(gcp_file:str,
                             wait=True,
                             dry_run=False)
         
+        # If post-processing fails, we should not attempt to create an index.
         try:
             pp_table = postprocess_bq(project,dataset,table,wait=True) # fix the schema of the exported table to contain one 'embedding' column containing a 1x64 array
+
+            # BigQuery does not allow creating a VECTOR index on a table with < 5k rows.
+            # Perform the vector_index fn as the last part of postprocessing if the condition is met.
+            row_count = len(plot_df)
+            if row_count > 5000:
+                print(f"Row count ({row_count}) > 5000. Creating Vector Index...")
+                vector_index(project,dataset,pp_table,embedding_col='embedding',wait=True)
+
+            print(f"Successfully created and processed table: {pp_table}")
         except Exception as e:
-            print(f"Couldn't post-process BQ table. reason: {e}")
-        
-        # apparently creating a VECTOR index on a BQ table with < 5k rows is not allowed
-        # so perform the vector_index fn as last part of postprocessing if row count condition is met
-        row_count = len(plot_df) 
-        if row_count > 5000:
-            print("Creating Vector Index for large (n>5k) table")
-            vector_index(project,dataset,table+"_pp",embedding_col='embedding',wait=True)
-        
-        print(f"{pp_table} created")
+            print(f"Failed to post-process or index table for year {year_tag}. Reason: {e}")
+            continue # Move to the next year in the loop
     return None
     
 if __name__ == "__main__":
@@ -49,13 +51,21 @@ if __name__ == "__main__":
     dataset = config['gcp']['bq-dataset']
     print(f"Using config: {config}")
 
-    # Set the credentials and project
-    ee.Initialize(project=project,
-                    opt_url="https://earthengine-highvolume.googleapis.com"
-                )
+    service_account_email = os.environ.get('SA_EMAIL')
+    key_file_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+
+    if not service_account_email or not key_file_path:
+        raise EnvironmentError(
+            "SA_EMAIL and GOOGLE_APPLICATION_CREDENTIALS environment variables must be set "
+            "for Earth Engine authentication."
+        )
+
+    credentials = ee.ServiceAccountCredentials(service_account_email, key_file_path)
+    ee.Initialize(credentials, project=project, opt_url="https://earthengine-highvolume.googleapis.com")
+
     ee.data.setWorkloadTag("efm-table-prep")
 
-    prep_tables(gcp_file="gs://sim-search/pre-table-test.geojson",
+    prep_tables(gcp_file="gs://sim-search/ceo-100-plots.geojson",
                 project=project,
                 dataset=dataset,
                 years=[2018,2019]

@@ -3,6 +3,7 @@ import ee
 import geemap
 import geopandas as gpd
 import pandas as pd
+import io
 from google.cloud.bigquery import Client
 import time
 from google.cloud import storage
@@ -41,81 +42,77 @@ def poll_submitted_task(task,sleeper:int|float):
         raise TypeError(f"{task} is not instance of <ee.batch.Task>. {type(task)}")
     return
 
-# these two functions handle tasks as generated from 
-# earthengine CLI (e.g. earthengine task list)
-# good for polling for tasks outside scope of their generation
-def ee_task_list_complete(desc:str,items:int):
+def ee_task_list_complete(task_description: str, items: int) -> list[bool]:
     """
-    Tests if particular type of task(s) have COMPLETED on EE server
-    args:
-        desc (str): description of task type in 2nd column of earthengine task list output
-        items (int): number of task items to check on (descending by date submitted)
-    returns:
-        list (e.g. [True,True,False])
-    """
-    # parse earthengine task list output into python list
-    ee_task_list = os.popen(f"earthengine task list").read().split('\n')
-    upload_tasks = [t for t in ee_task_list if desc in t][0:items]
-    # test each item's status reads COMPLETE
-    test_complete = ['COMPLETED' in t for t in upload_tasks]
-    return test_complete
+    Checks if the most recent Earth Engine tasks with a specific description have completed.
 
-def ee_task_list_poller(desc:str,items:int,sleep:int):
+    Args:
+        task_description (str): The description of the tasks to check.
+        items (int): The number of recent tasks with that description to check.
+
+    Returns:
+        A list of booleans indicating the completion status (e.g., [True, True, False]).
     """
-    Polls for tasks running on EE server, fetched by earthengine task list CLI command
-    args:
-        desc (str): one of Upload,Export.image, others?..
-        items (int): number of upload tasks to poll for
-        sleep (int): number of minutes to sleep in between checks
-    returns:
-        None
+    all_tasks = ee.batch.Task.list()
+    # Filter tasks by the exact description and get the most recent 'items'
+    relevant_tasks = [t for t in all_tasks if t.config['description'] == task_description][:items]
+    # Check if each task's state is COMPLETED
+    return [t.state == ee.batch.Task.State.COMPLETED for t in relevant_tasks]
+
+def ee_task_list_poller(task_description: str, items: int, sleep_minutes: int):
     """
-    #parses earthengine task list output
-    test_complete = ee_task_list_complete(desc,items)
+    Polls for the completion of Earth Engine tasks with a specific description.
+
+    Args:
+        task_description (str): The description of the tasks to poll.
+        items (int): The number of recent tasks to poll for.
+        sleep_minutes (int): The number of minutes to wait between checks.
+    """
+    test_complete = ee_task_list_complete(task_description, items)
     while not all(test_complete):
-        print(f"Waiting for one or more {desc} tasks to complete: {test_complete}. Sleeping {sleep} mins..")
-        time.sleep(60*sleep)
-        # Could fetch Upload, Export.image, other types of tasks 
-        # as presented in 2nd column of earthengine task list output
-        test_complete = ee_task_list_complete(desc,items)
-    
-    print(f'all {desc} complete')
-    return
+        print(
+            f"Waiting for one or more '{task_description}' tasks to complete: "
+            f"{test_complete}. Sleeping {sleep_minutes} mins..."
+        )
+        time.sleep(60 * sleep_minutes)
+        test_complete = ee_task_list_complete(task_description, items)
 
-def has_common_elements_all(list_a, list_b):
-  """
-  Returns True if there items in list_a are contained in list_b.
-  """
-  # For best performance, create a set from the shorter list.
-  set_b = set(list_b)
-  return all(item in set_b for item in list_a)
+    print(f"All '{task_description}' tasks are complete.")
+    return None
 
 def plot_to_df(file:str):
         if "gs://" in file:
-            # download from gcs first.. 
-            print('downloading from gcs..')
+            print('reading from gcs in-memory..')
             client = storage.Client()
             bucket_name = file.split('/')[2]
             blob_name = '/'.join(file.split('/')[3:])
             bucket = client.get_bucket(bucket_name)
             blob = bucket.blob(blob_name)
-            blob.download_to_filename(blob_name)
-            plots = gpd.read_file(blob_name)
+            
+            # Read the file directly into an in-memory bytes buffer
+            # This avoids writing temporary files to disk.
+            in_memory_file = io.BytesIO(blob.download_as_bytes())
+            plots = gpd.read_file(in_memory_file)
         else:
             plots = gpd.read_file(file)
+        
+        # --- Schema and dtype enforcement ---
+        required_cols = {'plotid', 'center_lon', 'center_lat', 'size_m'}
+        if not required_cols.issubset(plots.columns):
+            missing = required_cols - set(plots.columns)
+            raise KeyError(f"Input file is missing required columns: {sorted(list(missing))}")
+        
+        # Reduce to a consistent schema and order, and enforce types
+        schema_order = ['plotid', 'center_lon', 'center_lat', 'size_m']
+        plots = plots[schema_order]
+        plots['size_m'] = plots['size_m'].astype(float).astype(int)
+        plots['plotid'] = plots['plotid'].astype(float).astype(int)
+        
         return plots 
         
 def df_to_fc(df):
-    plots = df
-    columns = plots.columns
-    schema = ['plotid','center_lon','center_lat','size_m']
-    has_all_columns = has_common_elements_all(schema,columns)
-    if not has_all_columns:
-            raise ValueError(f"df does not contain required schema columns: {schema}")
-    plots = plots[schema]
-    size_m = int(str(plots.loc[0,'size_m']).split('.')[0])
-    fc = geemap.df_to_ee(plots,latitude="center_lat",longitude="center_lon")
-    return fc.set('plot_size',size_m)
+    fc = geemap.df_to_ee(df,latitude="center_lat",longitude="center_lon")
+    return fc
 
 def efm_plot_agg(fc:ee.FeatureCollection,
                  years:list[int],
@@ -139,7 +136,7 @@ def efm_plot_agg(fc:ee.FeatureCollection,
                         .mosaic())
                         fc_reduced = efm_yr.reduceRegions(collection=fc,
                                                         reducer=ee.Reducer.mean(),
-                                                        scale=fc.get('plot_size'),
+                                                        scale=fc.first().getNumber('size_m'),
                                                         crs='EPSG:4326',
                                                         crsTransform=None,
                                                         maxPixelsPerRegion=1e12,
@@ -231,7 +228,7 @@ def postprocess_bq(project:str="collect-earth-online",
         CLUSTER BY geo
         AS
         SELECT
-            plotid,
+            CAST(plotid AS INT64) AS plotid,
             geo,
             ARRAY[A00, A01, A02, A03, A04, A05, A06, A07, A08, A09, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23, A24, A25, A26, A27, A28, A29, A30, A31, A32, A33, A34, A35, A36, A37, A38, A39, A40, A41, A42, A43, A44, A45, A46, A47, A48, A49, A50, A51, A52, A53, A54, A55, A56, A57, A58, A59, A60, A61, A62, A63] AS embedding
         FROM
@@ -305,35 +302,36 @@ def table_exists(project:str,
         print(f"Table {table} does not exist. Error: {e}")
         return False
     
-def vector_search(plotid:str,
+def vector_search(plotid:int,
                   n_matches:int,
-                  project:str='collect-earth-online',
-                  dataset:str='sim_search_test',
-                  table:str='my_table',
+                  project:str,
+                  dataset:str,
+                  table:str,
                   ) -> pd.DataFrame:
     """Performs a vector search and returns the result as a pandas.DataFrame.
     
     Args:
-        project (str): cloud project your resources are contained in
-        dataset (str): BQ dataset your table is in
-        plotid (str): unique plotid value of the search's target record
+        plotid (int): unique plotid value of the search's target record
         n_matches (int): number of matches to return
+        project (str): cloud project your resources are contained in
+        dataset (str): BQ dataset your table is in_
+        
 
     Returns:
-        (BigQuery job): https://cloud.google.com/python/docs/reference/bigquery/latest/google.cloud.bigquery.job
+        (Pandas DataFrame): https://cloud.google.com/python/docs/reference/bigquery/latest/google.cloud.bigquery.job
     
     """
     
     query = f"""
 SELECT
-  '{str(plotid)}' AS target_plotid,
+  {plotid} AS target_plotid,
   base.plotid AS base_plotid,
   distance
 FROM
     VECTOR_SEARCH(
         TABLE `{dataset}.{table}`,
         'embedding',
-        (SELECT * FROM `{dataset}.{table}` WHERE plotid = '{str(plotid)}' LIMIT 1),
+        (SELECT * FROM `{dataset}.{table}` WHERE plotid = {plotid} LIMIT 1),
         top_k => {n_matches + 1},
         distance_type => 'COSINE',
         options => '{{"fraction_lists_to_search": 0.005}}'

@@ -3,7 +3,7 @@ import yaml
 import pandas as pd
 
 
-def search_result(uniqueid:str,
+def search_result(uniqueid:int,
                   matches:int,
                   project:str,
                   dataset:str,
@@ -13,7 +13,7 @@ def search_result(uniqueid:str,
     send a vector search request for a given bigquery table (project.dataset.table) and the search target's unique id, returning n_matches
 
     Args:
-        uniqueid (str|int): unique id of the search target
+        uniqueid (int): unique id of the search target
         matches (int): number of matches to return
         project (str): cloud project that your BQ resources are contained in
         dataset (str): BQ dataset your table is contained in
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     project_id = config['gcp']['project']
     dataset_id = config['gcp']['bq-dataset']
 
-    results = search_result(uniqueid="5",
+    results = search_result(uniqueid=5,
                             matches=5,
                             project=project_id,
                             dataset=dataset_id,
