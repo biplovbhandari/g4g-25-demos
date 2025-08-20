@@ -1,0 +1,108 @@
+from unittest.mock import patch, MagicMock
+import pandas as pd
+
+from src.prep import prep_tables
+
+
+@patch('src.prep.vector_index')
+@patch('src.prep.postprocess_bq')
+@patch('src.prep.export_to_bq')
+@patch('src.prep.efm_plot_agg')
+@patch('src.prep.df_to_fc')
+@patch('src.prep.plot_to_df')
+def test_prep_tables_small_dataset_no_vector_index(
+    mock_plot_to_df,
+    mock_df_to_fc,
+    mock_efm_plot_agg,
+    mock_export_to_bq,
+    mock_postprocess_bq,
+    mock_vector_index
+):
+    """
+    Tests prep_tables with a small dataset (< 5000 rows)
+    and verifies that vector_index is NOT called.
+    """
+    # Arrange: Set up test data and mock return values
+    gcp_file = "gs://fake-bucket/fake-file.geojson"
+    project = "test-project"
+    dataset = "test-dataset"
+    years = [2020]
+    table_base_name = "fake-file"
+    exported_table_name = f"{table_base_name}_{years[0]}_random123"
+
+    # Mock the return values of the dependent functions
+    mock_plot_to_df.return_value = pd.DataFrame({'plotid': range(100)})  # < 5000 rows
+    mock_df_to_fc.return_value = MagicMock(name="FeatureCollection")
+    mock_efm_plot_agg.return_value = [MagicMock(name="FC_embedding_2020")]
+    mock_export_to_bq.return_value = exported_table_name
+
+    # Act: Call the function under test
+    prep_tables(gcp_file, project, dataset, years)
+
+    # Assert: Verify that the mocked functions were called correctly
+    mock_plot_to_df.assert_called_once_with(gcp_file)
+    mock_df_to_fc.assert_called_once_with(mock_plot_to_df.return_value)
+    mock_efm_plot_agg.assert_called_once_with(mock_df_to_fc.return_value, years)
+
+    mock_export_to_bq.assert_called_once_with(
+        mock_efm_plot_agg.return_value[0],
+        project, dataset, table_base_name, str(years[0]),
+        wait=True, dry_run=False
+    )
+    mock_postprocess_bq.assert_called_once_with(
+        project, dataset, exported_table_name, wait=True
+    )
+    # Key assertion for this test: vector_index should not be called for small tables
+    mock_vector_index.assert_not_called()
+
+
+@patch('src.prep.vector_index')
+@patch('src.prep.postprocess_bq')
+@patch('src.prep.export_to_bq')
+@patch('src.prep.efm_plot_agg')
+@patch('src.prep.df_to_fc')
+@patch('src.prep.plot_to_df')
+def test_prep_tables_large_dataset_creates_vector_index(
+    mock_plot_to_df,
+    mock_df_to_fc,
+    mock_efm_plot_agg,
+    mock_export_to_bq,
+    mock_postprocess_bq,
+    mock_vector_index
+):
+    """
+    Tests prep_tables with a large dataset (> 5000 rows)
+    and verifies that vector_index IS called.
+    """
+    # Arrange: Set up test data and mock return values
+    gcp_file = "gs://fake-bucket/fake-file.geojson"
+    project = "test-project"
+    dataset = "test-dataset"
+    years = [2020]
+    table_base_name = "fake-file"
+    exported_table_name = f"{table_base_name}_{years[0]}_random123"
+    processed_table_name = f"{exported_table_name}_pp"
+
+    # Mock the return values of the dependent functions
+    mock_plot_to_df.return_value = pd.DataFrame({'plotid': range(6000)})  # > 5000 rows
+    mock_df_to_fc.return_value = MagicMock(name="FeatureCollection")
+    mock_efm_plot_agg.return_value = [MagicMock(name="FC_embedding_2020")]
+    mock_export_to_bq.return_value = exported_table_name
+    mock_postprocess_bq.return_value = processed_table_name
+
+    # Act: Call the function under test
+    prep_tables(gcp_file, project, dataset, years)
+
+    # Assert: Verify that the mocked functions were called correctly
+    mock_plot_to_df.assert_called_once_with(gcp_file)
+    mock_df_to_fc.assert_called_once_with(mock_plot_to_df.return_value)
+    mock_efm_plot_agg.assert_called_once_with(mock_df_to_fc.return_value, years)
+    mock_export_to_bq.assert_called_once()
+    mock_postprocess_bq.assert_called_once_with(
+        project, dataset, exported_table_name, wait=True
+    )
+    # Key assertion for this test: vector_index should be called for large tables
+    mock_vector_index.assert_called_once_with(
+        project, dataset, processed_table_name,
+        embedding_col='embedding', wait=True
+    )

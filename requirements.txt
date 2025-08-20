@@ -1,3 +1,5 @@
 geemap
 earthengine-api
 google-cloud-bigquery
+pytest
+pytest-mock

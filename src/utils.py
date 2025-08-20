@@ -4,11 +4,10 @@ import geemap
 import geopandas as gpd
 import pandas as pd
 from google.cloud.bigquery import Client
-from google.cloud import bigquery
 import time
+from google.cloud import storage
 import random
 
-ee.Initialize()
 def poll_submitted_task(task,sleeper:int|float):
     """
     polls for the status of one started task, completes when task status is 'COMPLETED'
@@ -91,17 +90,32 @@ def has_common_elements_all(list_a, list_b):
   set_b = set(list_b)
   return all(item in set_b for item in list_a)
 
-def plot_to_fc(file:str):
-        plots = gpd.read_file(file)
-        columns = plots.columns
-        schema = ['plotid','center_lon','center_lat','size_m']
-        has_all_columns = has_common_elements_all(schema,columns)
-        if not has_all_columns:
-                raise ValueError(f"{file} does not contain required schema columns: {schema}")
-        plots = plots[schema]
-        size_m = int(str(plots.loc[0,'size_m']).split('.')[0])
-        fc = geemap.df_to_ee(plots,latitude="center_lat",longitude="center_lon")
-        return fc.set('plot_size',size_m)
+def plot_to_df(file:str):
+        if "gs://" in file:
+            # download from gcs first.. 
+            print('downloading from gcs..')
+            client = storage.Client()
+            bucket_name = file.split('/')[2]
+            blob_name = '/'.join(file.split('/')[3:])
+            bucket = client.get_bucket(bucket_name)
+            blob = bucket.blob(blob_name)
+            blob.download_to_filename(blob_name)
+            plots = gpd.read_file(blob_name)
+        else:
+            plots = gpd.read_file(file)
+        return plots 
+        
+def df_to_fc(df):
+    plots = df
+    columns = plots.columns
+    schema = ['plotid','center_lon','center_lat','size_m']
+    has_all_columns = has_common_elements_all(schema,columns)
+    if not has_all_columns:
+            raise ValueError(f"df does not contain required schema columns: {schema}")
+    plots = plots[schema]
+    size_m = int(str(plots.loc[0,'size_m']).split('.')[0])
+    fc = geemap.df_to_ee(plots,latitude="center_lat",longitude="center_lon")
+    return fc.set('plot_size',size_m)
 
 def efm_plot_agg(fc:ee.FeatureCollection,
                  years:list[int],
@@ -175,7 +189,6 @@ def export_to_bq(fc:ee.FeatureCollection,
                         collection=fc,
                         description=tb,
                         table=tb,
-                        # append=True,
                         overwrite=True # would probably want to overwrite as exporting to exact same table would only happen on error
                 )
                      
