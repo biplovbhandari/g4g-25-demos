@@ -62,11 +62,4 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run integration tests
-        env:
-          # The integration tests expect these env vars.
-          # The auth action creates the credentials file for us.
-          SA_EMAIL: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
         run: pytest tests/test_integration.py
-
-

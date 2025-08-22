@@ -51,17 +51,9 @@ if __name__ == "__main__":
     dataset = config['gcp']['bq-dataset']
     print(f"Using config: {config}")
 
-    service_account_email = os.environ.get('SA_EMAIL')
-    key_file_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-
-    if not service_account_email or not key_file_path:
-        raise EnvironmentError(
-            "SA_EMAIL and GOOGLE_APPLICATION_CREDENTIALS environment variables must be set "
-            "for Earth Engine authentication."
-        )
-
-    credentials = ee.ServiceAccountCredentials(service_account_email, key_file_path)
-    ee.Initialize(credentials, project=project, opt_url="https://earthengine-highvolume.googleapis.com")
+    # When running locally, GOOGLE_APPLICATION_CREDENTIALS must be set in the environment.
+    # ee.Initialize() will automatically find and use them.
+    ee.Initialize(project=project, opt_url="https://earthengine-highvolume.googleapis.com")
 
     ee.data.setWorkloadTag("efm-table-prep")
 

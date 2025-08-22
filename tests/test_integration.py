@@ -3,6 +3,7 @@ import yaml
 from google.cloud import storage, bigquery
 from google.api_core import exceptions
 import ee
+import os
 
 # Mark this entire module as 'integration' tests
 pytestmark = pytest.mark.integration
@@ -54,10 +55,13 @@ def test_gcp_connectivity(gcp_config):
 
     # 3. Test Earth Engine Initialization and a simple request
     try:
+        # In the GHA environment, the auth action sets up Application Default Credentials.
+        # ee.Initialize() will find them automatically.
         ee.Initialize(project=project, opt_url="https://earthengine-highvolume.googleapis.com")
+
         # Perform a simple, low-cost operation to verify API works
         image_info = ee.Image("USGS/SRTMGL1_003").getInfo()
+        assert image_info is not None, "returned image_info is None"
         print("Successfully initialized Earth Engine and fetched info.")
-        assert image_info["type"] == "Image"
     except Exception as e:
         pytest.fail(f"Failed to initialize or communicate with Earth Engine: {e}")

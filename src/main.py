@@ -35,14 +35,11 @@ async def startup_event():
     try:
         # Load settings at startup to fail fast if config is missing/invalid
         settings = get_settings()
-        service_account_email = os.environ.get('SA_EMAIL')
-        key_file_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-        if not service_account_email or not key_file_path:
-            print("Warning: SA_EMAIL or GOOGLE_APPLICATION_CREDENTIALS not set. /prep endpoint will not work.")
-            return
-        credentials = ee.ServiceAccountCredentials(service_account_email, key_file_path)
+        # In a GCP environment (Cloud Run, GHA), ee.Initialize() will automatically
+        # find the credentials. For local dev, GOOGLE_APPLICATION_CREDENTIALS must be set.
         ee.Initialize(
-            credentials,
+            # credentials=None lets the library find them automatically.
+            credentials=None,
             project=settings.gcp.project,
             opt_url="https://earthengine-highvolume.googleapis.com"
         )
