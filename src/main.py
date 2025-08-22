@@ -3,6 +3,7 @@ import yaml
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 import ee
+import google.auth
 
 from src.prep import prep_tables
 from src.search import search_result
@@ -35,11 +36,18 @@ async def startup_event():
     try:
         # Load settings at startup to fail fast if config is missing/invalid
         settings = get_settings()
-        # In a GCP environment (Cloud Run, GHA), ee.Initialize() will automatically
-        # find the credentials. For local dev, GOOGLE_APPLICATION_CREDENTIALS must be set.
+
+        # Use google.auth.default() to get credentials. This works in GHA, Cloud Run,
+        # and local dev with GOOGLE_APPLICATION_CREDENTIALS set.
+        credentials, _ = google.auth.default(
+            scopes=[
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/earthengine",
+            ]
+        )
+
         ee.Initialize(
-            # credentials=None lets the library find them automatically.
-            credentials=None,
+            credentials=credentials,
             project=settings.gcp.project,
             opt_url="https://earthengine-highvolume.googleapis.com"
         )

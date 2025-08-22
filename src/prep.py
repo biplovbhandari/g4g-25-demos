@@ -2,6 +2,7 @@ from src.utils import efm_plot_agg, export_to_bq, postprocess_bq, vector_index, 
 import yaml
 import os
 import ee
+import google.auth
 
 
 def prep_tables(gcp_file:str,
@@ -51,9 +52,15 @@ if __name__ == "__main__":
     dataset = config['gcp']['bq-dataset']
     print(f"Using config: {config}")
 
-    # When running locally, GOOGLE_APPLICATION_CREDENTIALS must be set in the environment.
-    # ee.Initialize() will automatically find and use them.
-    ee.Initialize(project=project, opt_url="https://earthengine-highvolume.googleapis.com")
+    # Use google.auth.default() to get credentials. This works for local dev
+    # when GOOGLE_APPLICATION_CREDENTIALS is set in the environment.
+    credentials, _ = google.auth.default(
+        scopes=[
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/earthengine",
+        ]
+    )
+    ee.Initialize(credentials, project=project, opt_url="https://earthengine-highvolume.googleapis.com")
 
     ee.data.setWorkloadTag("efm-table-prep")
 

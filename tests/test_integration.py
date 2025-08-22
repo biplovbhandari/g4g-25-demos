@@ -4,6 +4,7 @@ from google.cloud import storage, bigquery
 from google.api_core import exceptions
 import ee
 import os
+import google.auth
 
 # Mark this entire module as 'integration' tests
 pytestmark = pytest.mark.integration
@@ -55,9 +56,15 @@ def test_gcp_connectivity(gcp_config):
 
     # 3. Test Earth Engine Initialization and a simple request
     try:
-        # In the GHA environment, the auth action sets up Application Default Credentials.
-        # ee.Initialize() will find them automatically.
-        ee.Initialize(project=project, opt_url="https://earthengine-highvolume.googleapis.com")
+        # Use google.auth.default() to get the credentials configured by the GHA auth action.
+        # This is the most reliable way to use ADC with the ee library.
+        credentials, _ = google.auth.default(
+            scopes=[
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/earthengine",
+            ]
+        )
+        ee.Initialize(credentials, project=project, opt_url="https://earthengine-highvolume.googleapis.com")
 
         # Perform a simple, low-cost operation to verify API works
         image_info = ee.Image("USGS/SRTMGL1_003").getInfo()
