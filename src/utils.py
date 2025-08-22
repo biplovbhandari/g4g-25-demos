@@ -96,7 +96,7 @@ def plot_to_df(file:str):
         else:
             plots = gpd.read_file(file)
         
-        # --- Schema and dtype enforcement ---
+        # --- Schema and dtype enforcement ----
         required_cols = {'plotid', 'center_lon', 'center_lat', 'size_m'}
         if not required_cols.issubset(plots.columns):
             missing = required_cols - set(plots.columns)
