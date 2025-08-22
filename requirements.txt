@@ -9,3 +9,4 @@ PyYAML
 db-dtypes
 fastapi
 uvicorn[standard]
+pydantic-settings # Explicitly add for clarity, though often included with pydantic

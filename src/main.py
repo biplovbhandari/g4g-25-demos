@@ -1,5 +1,3 @@
-import os
-import yaml
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 import ee

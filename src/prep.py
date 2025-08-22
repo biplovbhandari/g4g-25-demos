@@ -1,8 +1,9 @@
-from src.utils import efm_plot_agg, export_to_bq, postprocess_bq, vector_index, plot_to_df, df_to_fc
-import yaml
 import os
 import ee
 import google.auth
+
+from src.utils import efm_plot_agg, export_to_bq, postprocess_bq, vector_index, plot_to_df, df_to_fc
+
 
 
 def prep_tables(gcp_file:str,
@@ -45,12 +46,10 @@ def prep_tables(gcp_file:str,
     return None
     
 if __name__ == "__main__":
-    with open('config.yml', 'r') as f:
-        config = yaml.safe_load(f)
-
-    project = config['gcp']['project']
-    dataset = config['gcp']['bq-dataset']
-    print(f"Using config: {config}")
+    # For local execution, ensure GCP_PROJECT, GCP_BQ_DATASET, GCP_BUCKET are set as environment variables
+    # or in a .env file in the project root.
+    project = os.environ.get('GCP_PROJECT')
+    dataset = os.environ.get('GCP_BQ_DATASET')
 
     # Use google.auth.default() to get credentials. This works for local dev
     # when GOOGLE_APPLICATION_CREDENTIALS is set in the environment.

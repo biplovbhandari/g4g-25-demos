@@ -1,7 +1,7 @@
-from src.utils import vector_search, table_exists
 import yaml
 import pandas as pd
 
+from src.utils import vector_search, table_exists
 
 def search_result(uniqueid:int,
                   matches:int,

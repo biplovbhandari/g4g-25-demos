@@ -21,9 +21,6 @@ RUN pip install --no-cache-dir --trusted-host pypi.python.org -r requirements.tx
 # Copy the application source code into the container
 COPY src/ ./src/
 
-# Copy the configuration file
-COPY config.yml .
-
 # Expose the port the app runs on
 EXPOSE 8080
 
