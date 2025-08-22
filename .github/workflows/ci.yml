@@ -2,9 +2,9 @@ name: Python CI
 
 on:
   push:
-    branches: [ "api" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "api" ]
+    branches: [ "main" ]
 
 permissions:
   contents: read
