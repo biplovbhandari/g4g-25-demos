@@ -1,25 +1,31 @@
-from pydantic import Field
+from pydantic import Field, BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
-class GcpSettings(BaseSettings):
-    # Pydantic BaseSettings automatically maps field names to environment variables
-    # (e.g., 'project' -> PROJECT, 'bq_dataset' -> BQ_DATASET).
-    # We can use Field(alias=...) for 'bq-dataset' to map it to BQ_DATASET env var.
-    # Or, more simply, just use the exact env var names as field names.
-    # Let's use explicit env var names for clarity.
-    project: str = Field(..., env='GCP_PROJECT')
-    bq_dataset: str = Field(..., env='GCP_BQ_DATASET')
-    bucket: str = Field(..., env='GCP_BUCKET')
+class GcpSettings(BaseModel):
+    """A simple Pydantic model to hold GCP settings, not for loading."""
+    project: str
+    bq_dataset: str
+    bucket: str
 
 class AppSettings(BaseSettings):
-    gcp: GcpSettings
+    """The main settings object that loads all variables from the environment."""
+    # Define fields at the top level, using aliases to map to env vars.
+    # This is the most robust way to load them.
+    gcp_project: str = Field(..., alias='GCP_PROJECT')
+    gcp_bq_dataset: str = Field(..., alias='GCP_BQ_DATASET')
+    gcp_bucket: str = Field(..., alias='GCP_BUCKET')
 
     model_config = SettingsConfigDict(
         env_file='.env', # Load environment variables from .env file for local development
         env_file_encoding='utf-8',
         extra='ignore' # Ignore extra fields in .env or environment
     )
+
+    @property
+    def gcp(self) -> GcpSettings:
+        """Provides a nested `gcp` object for convenient access in the app."""
+        return GcpSettings(project=self.gcp_project, bq_dataset=self.gcp_bq_dataset, bucket=self.gcp_bucket)
 
 @lru_cache()
 def get_settings() -> AppSettings:

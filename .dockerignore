@@ -1,12 +1,20 @@
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.pytest_cache/
-tests/
-.git/
+# Git and GitHub specific
+.git
+.github
 .gitignore
+
+# Python cache and artifacts
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Local environment and config files
+.env
+config.yml
+
+# Documentation and tests not needed in the final image
+notebooks/
+tests/
+README.md
 Dockerfile
 .dockerignore
-README.md
-plots/

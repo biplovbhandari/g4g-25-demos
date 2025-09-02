@@ -1,6 +1,5 @@
-import yaml
 import pandas as pd
-
+import os
 from src.utils import vector_search, table_exists
 
 def search_result(uniqueid:int,
@@ -37,15 +36,13 @@ def search_result(uniqueid:int,
 
 
 if __name__ == "__main__":
-    with open('config.yml', 'r') as f:
-        config = yaml.safe_load(f)
-
-    project_id = config['gcp']['project']
-    dataset_id = config['gcp']['bq-dataset']
+    
+    project = os.environ.get('GCP_PROJECT')
+    dataset = os.environ.get('GCP_BQ_DATASET')
 
     results = search_result(uniqueid=5,
                             matches=5,
-                            project=project_id,
-                            dataset=dataset_id,
-                            table="ceo-Okayama-Tile-5-v2-plot-data-2025-07-22_2022_2022_437_pp")
+                            project=project,
+                            dataset=dataset,
+                            table="ceo-100-plots_2019_838_pp")
     print(results)

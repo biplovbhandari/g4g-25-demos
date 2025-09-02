@@ -59,8 +59,8 @@ async def startup_event():
         logger.info("Earth Engine initialized successfully for project %s.", project)
     except ValidationError as e:
         logger.critical(
-            "FATAL: Configuration validation error. Missing or invalid environment variables (GCP_PROJECT_ID, GCP_BQ_DATASET, GCP_BUCKET). "
-            "The application cannot start correctly. Pydantic error: %s", e
+            "FATAL: Configuration validation error. Missing or invalid environment variables (e.g., GCP_PROJECT, GCP_BQ_DATASET, GCP_BUCKET). "
+            "The application cannot start correctly. Pydantic error: %s", e, exc_info=True
         )
         # In a real-world scenario, you might want to exit the application
         # but for Cloud Run, letting it start and fail on requests is also an option.
