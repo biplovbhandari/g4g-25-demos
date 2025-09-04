@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, ValidationError
 import ee
 import google.auth
 
-from src.prep import prep_tables
+from src.prep import prep_tables, generate_processed_table_names
 from src.search import search_result
 from src.config import get_settings, AppSettings
 
@@ -25,6 +25,10 @@ app = FastAPI(
 class PrepRequest(BaseModel):
     gcp_file: str = Field(..., example="gs://your-bucket/your-file.geojson", description="GCS path to the GeoJSON plot file.")
     years: list[int] = Field(..., example=[2020, 2021], description="List of years to process.")
+
+class PrepResponse(BaseModel):
+    message: str
+    tables: dict[int, str] = Field(..., example={2020: "your-file_2020_pp", 2021: "your-file_2021_pp"}, description="A dictionary mapping each year to the name of the BigQuery table that will be created.")
 
 class SearchResponse(BaseModel):
     target_plotid: int
@@ -68,7 +72,7 @@ async def startup_event():
         # Log the error but allow the app to start, as the /search endpoint may still work.
         logger.error("FATAL: Could not initialize Earth Engine. The /prep endpoint will fail. Error: %s", e, exc_info=True)
 
-@app.post("/prep", status_code=202)
+@app.post("/prep", status_code=202, response_model=PrepResponse)
 async def create_prep_job(
     request: PrepRequest,
     background_tasks: BackgroundTasks,
@@ -76,12 +80,16 @@ async def create_prep_job(
 ):
     """
     Accepts a data preparation job and runs it in the background.
+    Returns the names of the tables that will be created.
     """
     print(f"Received prep job for {request.gcp_file} for years {request.years}")
+
+    table_names = generate_processed_table_names(request.gcp_file, request.years)
+
     background_tasks.add_task(
         prep_tables, request.gcp_file, settings.gcp.project, settings.gcp.bq_dataset, request.years
     )
-    return {"message": "Data preparation job accepted and running in the background."}
+    return {"message": "Data preparation job accepted and running in the background.", "tables": table_names}
 
 @app.get("/search", response_model=list[SearchResponse])
 async def run_search(

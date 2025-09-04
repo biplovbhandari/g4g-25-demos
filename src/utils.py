@@ -7,7 +7,6 @@ import io
 from google.cloud.bigquery import Client
 import time
 from google.cloud import storage
-import random
 
 def poll_submitted_task(task,sleeper:int|float):
     """
@@ -170,8 +169,8 @@ def export_to_bq(fc:ee.FeatureCollection,
 
         if not all((isinstance(yr_tag,str), len(yr_tag)==4)):
              raise ValueError(f" yr_tag expects a %04 formatted string (e.g. '2023'). provided {yr_tag}")
-        r_id = str(random.Random().randint(100,999)) # this is just to avoid weird BQ write errors during testing (unexpected behavior when deleting and re-creating same table name repeatedly)
-        tb = f'{project}.{dataset}.{table}_{yr_tag}_{r_id}' 
+        # Removed random id for deterministic naming, allowing front-end to know table names in advance.
+        tb = f'{project}.{dataset}.{table}_{yr_tag}'
         if len(tb) > 100: # simpler if desc and out table are same but ee.export desc has 100 char limit; 
                 base_char_len = len(tb)-len(table)
                 leftovers = 100-base_char_len
