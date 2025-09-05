@@ -36,6 +36,7 @@ jobs:
         run: |-
           gcloud builds submit \
           --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/gcp-sim-search-api:latest 
+          --default-buckets-behavior=regional-user-owned-bucket
           --gcs-log-dir ${{ secrets.GCP_LOG_BUCKET }}
 
       - name: Deploy to Cloud Run
