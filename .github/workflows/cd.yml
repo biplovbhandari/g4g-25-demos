@@ -34,7 +34,9 @@ jobs:
 
       - name: Build and Push Docker image
         run: |-
-          gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/gcp-sim-search-api:latest --suppress-logs
+          gcloud builds submit \
+          --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/gcp-sim-search-api:latest 
+          --gcs-log-dir ${{ secrets.GCP_LOG_BUCKET }}
 
       - name: Deploy to Cloud Run
         run: |-
