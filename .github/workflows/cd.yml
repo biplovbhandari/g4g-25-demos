@@ -3,7 +3,11 @@ name: Deploy to Cloud Run
 on:
   push:
     branches:
-      - api # Or 'main', depending on your deployment strategy
+      - main
+  pull_request:
+    branches:
+      - main
+
 
 permissions:
   contents: read
