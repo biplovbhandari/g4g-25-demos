@@ -123,7 +123,7 @@ function runSearch() {
   "  e       AS val,\n" +
   "  idx     AS idx\n" +
   "FROM points\n" +
-  "JOIN `ee-biplov-sandbox.naip_embeddings.embeddings` AS t\n" +
+  "JOIN `biplov-gde-project.naip_embeddings.embeddings` AS t\n" +
   "  ON ST_CONTAINS(\n" +
   "       t.geometry,\n" +
   "       ST_GEOGPOINT(points.lon, points.lat)\n" +
@@ -152,7 +152,7 @@ function runSearch() {
   "  distance\n" +
   "FROM\n" +
   "  VECTOR_SEARCH(\n" +
-  "    TABLE `ee-biplov-sandbox.naip_embeddings.embeddings`,\n" +
+  "    TABLE `biplov-gde-project.naip_embeddings.embeddings`,\n" +
   "    'embeddings',\n" +
   "    TABLE mean_embedding,\n" +
   "    TOP_K         => 100,\n" +
