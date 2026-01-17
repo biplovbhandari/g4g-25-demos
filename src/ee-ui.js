@@ -1,12 +1,37 @@
-// 1) Base map and NAIP layer
+/**
+ * Earth Engine UI for BigQuery Vector Search with NAIP Embeddings
+ *
+ * PREREQUISITES:
+ * This script must be run after executing the notebook available at:
+ * https://colab.research.google.com/drive/1-kxxqp42WZxS9Y0DEGI1Oq4PzAdZ4jGn?usp=sharing
+ *
+ * IMPORTANT: Before running this script, update the BigQuery table reference
+ * in the input field below to point to the table exported from the notebook above.
+ * The default value is an example and should be replaced with your exported table.
+ *
+ * DESCRIPTION:
+ * Interactive Earth Engine UI for finding similar NAIP tiles using BigQuery
+ * vector search. Users can click on the map or enter coordinates to select
+ * example points, then search for similar tiles based on embedding similarity.
+ *
+ * USAGE:
+ * 1. Update the BigQuery table reference to your exported embeddings table
+ * 2. Click on the map or enter coordinates to select example points
+ * 3. Click "Add Point" button as you add more example points
+ * 4. Click "Search Similar Tiles" to find similar tiles using vector search
+ * 5. Export results to Google Drive if needed
+ *
+ * @author Biplov Bhandari
+ * @lastModified January 17, 2026
+ */
+
+// Base map and NAIP layer
 var map = ui.Map();
-// map.setOptions('SATELLITE');
 map.style().set('cursor', 'crosshair');
 map.setCenter(-119.216358, 46.733559, 8);
 
 // Load and add NAIP 2020–2024 composite
 var naip = ee.ImageCollection('USDA/NAIP/DOQQ');
-// naip years: [ 2005, 2008, 2010, 2013, 2015, 2017, 2018, 2020, 2021, 2022, 2023, 2024, ]
 var y_2020 = naip.filter(ee.Filter.calendarRange(2020, 2020, 'year')).select(['R', 'G', 'B', 'N']).median();
 var y_2021 = naip.filter(ee.Filter.calendarRange(2021, 2021, 'year')).select(['R', 'G', 'B', 'N']).median();
 var y_2022 = naip.filter(ee.Filter.calendarRange(2022, 2022, 'year')).select(['R', 'G', 'B', 'N']).median();
@@ -19,17 +44,28 @@ map.addLayer(y_2022, {bands: ['R','G','B'], min: 0, max: 255}, 'NAIP 2022', fals
 map.addLayer(y_2023, {bands: ['R','G','B'], min: 0, max: 255}, 'NAIP 2023', false);
 map.addLayer(y_2024, {bands: ['R','G','B'], min: 0, max: 255}, 'NAIP 2024', false);
 
-
-// 2) UI panel
+// UI panel
 var panel = ui.Panel({style:{position:'bottom-left', width:'300px'}});
-ui.root.clear(); ui.root.add(map); ui.root.add(panel);
+ui.root.clear();
+ui.root.add(map);
+ui.root.add(panel);
 
-// 3) Controls
+// BigQuery table input
+var bqTableInput = ui.Textbox({
+  placeholder: 'project.dataset.table',
+  value: 'biplov-gde-project.naip_embeddings.embeddings',
+  style: {stretch: 'horizontal'}
+});
+panel.add(ui.Label('BigQuery Table Reference:', {fontWeight: 'bold'}));
+panel.add(ui.Label('Provide a fully qualified table reference in the form `project.dataset.table`'));
+panel.add(bqTableInput);
+
+// Instructions
 panel.add(ui.Label('1) Click map or enter coords below.'));
-panel.add(ui.Label('2) Then click "Search Similar Tiles".'));
+panel.add(ui.Label('2) Click "Add Point" button as you add more example points on the map.'));
+panel.add(ui.Label('3) Then click "Search Similar Tiles".'));
 
-// panel.add(ui.Label('Click map or type coords, then "Add Point":'));
-
+// Coordinate inputs
 var lonInput = ui.Textbox({placeholder:'Longitude', value: -117.921367, style:{stretch:'horizontal'}});
 var latInput = ui.Textbox({placeholder:'Latitude', value: 48.548551, style:{stretch:'horizontal'}});
 panel.add(ui.Label('Enter coordinates here:'));
@@ -38,24 +74,24 @@ panel.add(lonInput).add(latInput);
 var addBtn = ui.Button('Add Point', function() { addPoint(); });
 panel.add(addBtn);
 
-// 4) Point list and clear button
+// Point list and clear button
 var listLabel = ui.Label('Selected Points:', {margin:'6px 0 0 0'});
 var listPanel = ui.Panel([], ui.Panel.Layout.flow('vertical'));
 var clearBtn = ui.Button('Clear All', function() { clearPoints(); });
 panel.add(listLabel).add(listPanel).add(clearBtn);
 
-// 5) Search button
+// Search button
 var searchBtn = ui.Button('Search Similar Tiles', function() { runSearch(); },
                           {disabled:true, margin:'6px 0 0 0'});
 panel.add(searchBtn);
 
-// 6) Data structures
-var selectedPoints = [];   // array of {lon,lat}
-var markers = [];          // ui.Map.Layer for each point
-var resultLayer = null;    // for previous results
+// Data structures
+var selectedPoints = []; // array of {lon,lat}
+var markers = [];
+var resultLayer = null;
 var bufferedResultLayer = null;
 
-// 7) Helpers: render listPanel
+// Render list of selected points
 function refreshList() {
   listPanel.clear();
   selectedPoints.forEach(function(pt, idx) {
@@ -66,14 +102,13 @@ function refreshList() {
   searchBtn.setDisabled(selectedPoints.length === 0);
 }
 
-// 8) Add a point (from inputs or last click)
+// Add a point from coordinate inputs
 function addPoint() {
   var lon = parseFloat(lonInput.getValue());
   var lat = parseFloat(latInput.getValue());
-  if (isNaN(lon)||isNaN(lat)) return;
+  if (isNaN(lon) || isNaN(lat)) return;
 
   selectedPoints.push({lon:lon, lat:lat});
-  // add marker
   var dot = ee.Geometry.Point([lon,lat]);
   var m = ui.Map.Layer(dot, {color:'red'}, 'pt'+selectedPoints.length);
   map.layers().add(m);
@@ -81,39 +116,50 @@ function addPoint() {
   refreshList();
 }
 
-// 9) Clear all
+// Clear all points and results
 function clearPoints() {
   selectedPoints = [];
   listPanel.clear();
   searchBtn.setDisabled(true);
   markers.forEach(function(m){ map.layers().remove(m); });
   markers = [];
-  if (resultLayer) map.layers().remove(resultLayer);
   if (resultLayer) {
     map.layers().remove(resultLayer);
     resultLayer = null;
-    enableExport();
   }
+  if (bufferedResultLayer) {
+    map.layers().remove(bufferedResultLayer);
+    bufferedResultLayer = null;
+  }
+  enableExport();
 }
 
-// 10) Map click → populate inputs (does not auto-add)
+// Map click handler - populate coordinate inputs
 map.onClick(function(coords){
   lonInput.setValue(coords.lon.toFixed(6));
   latInput.setValue(coords.lat.toFixed(6));
   listLabel.setValue('Selected: ' + coords.lon.toFixed(6) + ', ' + coords.lat.toFixed(6));
 });
 
-// 11) Build and run the BigQuery using the mean embedding
+// Build and run the BigQuery vector search using the mean embedding
 function runSearch() {
-  // remove old results
+  // Get BigQuery table reference from input
+  var bqTable = bqTableInput.getValue().trim();
+  if (!bqTable) {
+    ui.alert('Please enter a BigQuery table reference.');
+    return;
+  }
+
+  // Remove old results
   if (resultLayer) map.layers().remove(resultLayer);
+  if (bufferedResultLayer) map.layers().remove(bufferedResultLayer);
 
   // Build the WITH points AS (...) SQL
   var pointsSQL = selectedPoints.map(function(pt){
     return 'SELECT ' + pt.lon + ' AS lon, ' + pt.lat + ' AS lat';
   }).join(' UNION ALL\n  ');
 
-  // Build the SQL query string
+  // Build the SQL query string with parameterized table reference
   var sql =
   "WITH points AS (\n" +
   pointsSQL + "\n" +
@@ -123,7 +169,7 @@ function runSearch() {
   "  e       AS val,\n" +
   "  idx     AS idx\n" +
   "FROM points\n" +
-  "JOIN `biplov-gde-project.naip_embeddings.embeddings` AS t\n" +
+  "JOIN `" + bqTable + "` AS t\n" +
   "  ON ST_CONTAINS(\n" +
   "       t.geometry,\n" +
   "       ST_GEOGPOINT(points.lon, points.lat)\n" +
@@ -152,7 +198,7 @@ function runSearch() {
   "  distance\n" +
   "FROM\n" +
   "  VECTOR_SEARCH(\n" +
-  "    TABLE `biplov-gde-project.naip_embeddings.embeddings`,\n" +
+  "    TABLE `" + bqTable + "`,\n" +
   "    'embeddings',\n" +
   "    TABLE mean_embedding,\n" +
   "    TOP_K         => 100,\n" +
@@ -163,35 +209,32 @@ function runSearch() {
   "  AND distance < 0.2\n" +
   "ORDER BY distance ASC\n";
 
-  // Run and buffer the matches
+  // Run BigQuery and buffer the matches
   var fc = ee.FeatureCollection.runBigQuery(sql, 'geometry', 1e11);
+
   // Turn tiles into circles for visibility
   var circles = fc.map(function(f){
-    return ee.Feature(f.geometry().centroid().buffer(500),
-                      f.toDictionary());
+    return ee.Feature(f.geometry().centroid().buffer(500), f.toDictionary());
   });
 
-
+  // Add buffered results layer
   var visParamsBuffered = { color: 'yellow' };
-  if (bufferedResultLayer) map.layers().remove(bufferedResultLayer);
   bufferedResultLayer = ui.Map.Layer(circles, visParamsBuffered, 'Similar Tiles (buffered)');
   map.layers().add(bufferedResultLayer);
 
+  // Add original results layer
   var visParams = { color: 'green' };
-  if (resultLayer) map.layers().remove(resultLayer);
   resultLayer = ui.Map.Layer(fc, visParams, 'Similar Tiles');
   map.layers().add(resultLayer);
-
 
   print('returned embeddings tiles', fc.size());
   print('example embeddings tiles', fc.limit(5));
 
   enableExport();
-
 }
 
 
-// 12) Export button
+// Export button
 var exportBtn = ui.Button({
   label: 'Export Matches to Drive',
   disabled: true,
@@ -199,21 +242,18 @@ var exportBtn = ui.Button({
 });
 panel.add(exportBtn);
 
-// 13) Enable export when results arrive
+// Enable export button when results are available
 function enableExport() {
   exportBtn.setDisabled(resultLayer === null);
 }
 
-// 14) Export function
+// Export function
 function exportMatches() {
   if (!resultLayer) {
     ui.alert('No matches to export.');
     return;
   }
-  // Grab the FeatureCollection (buffered circles)
   var fc = resultLayer.getEeObject();
-
-  // Kick off a Drive export job
   Export.table.toDrive({
     collection: fc,
     description: 'NAIP_Similar_Tiles_Export',
