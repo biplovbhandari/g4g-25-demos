@@ -1,6 +1,11 @@
-# g4g-25-demos
+# [Geo for Good 2025](https://earthoutreachonair.withgoogle.com/events/geoforgood25-nyc) Demos
 
 Demos and experiments for embeddings-as-a-service (EaaS): patch vs pixel embeddings, BigQuery vector search, and Earth Engine UIs.
+
+### Resources
+
+- **Video:** [Embedding Vector Search and Beyond with BigQuery and Earth Engine](https://www.youtube.com/watch?v=KVdJiiP0Ym4)
+- **Slides:** [Embedding Vector Search and Beyond with BigQuery and Earth Engine (PDF)](https://drive.google.com/file/d/1JvNZNkoXn80B6eePNqJNLW4QpPXEwJPM/view)
 
 ### Background
 
